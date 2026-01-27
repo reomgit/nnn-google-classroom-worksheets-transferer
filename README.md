@@ -6,7 +6,7 @@
 
 ## ✨ 主な機能
 
-*   **自動検出**: Google Drive 内の `Classroom` フォルダを自動的に見つけ出し、クラス一覧を取得します。
+*   **自動検出**: Google Drive 内の `Classroom` フォルダを自動的に見つけ出し、授業WS一覧を取得します。
 *   **ショートカット解決**: Drive 上のショートカット (`.shortcut`) を認識し、リンク元の**実体ファイル**を操作対象とします。
 *   **一括移動**: スプレッドシートに移動先の URL を貼るだけで、ファイルを指定フォルダへ一括移動します。
 *   **名前の同期**: ショートカット側でファイル名を変更していた場合、移動時に実体ファイルの名前も自動的に同期（リネーム）します。
@@ -33,9 +33,9 @@ var ROOT_FOLDER_NAME = "Classroom";
 
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('🎓 クラスルームマネージャー')
-    .addItem('1. クラスを探す', 'listClassFolders')
-    .addItem('2. 選択したクラスからファイルを取得', 'fetchFilesFromSelection')
+    .createMenu('🎓 授業WSマネージャー')
+    .addItem('1. 授業WSを探す', 'listClassFolders')
+    .addItem('2. 選択した授業WSからファイルを取得', 'fetchFilesFromSelection')
     .addItem('3. ファイルを移動', 'processMoveQueue')
     .addToUi();
 }
@@ -44,7 +44,7 @@ function listClassFolders() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   sheet.clear();
   
-  sheet.appendRow(["選択", "クラス名", "フォルダID", "フォルダURL"]);
+  sheet.appendRow(["選択", "授業WS名", "フォルダID", "フォルダURL"]);
   sheet.getRange("A1:D1").setFontWeight("bold");
   
   var folders = DriveApp.getFoldersByName(ROOT_FOLDER_NAME);
@@ -70,7 +70,7 @@ function listClassFolders() {
       var range = sheet.getRange(2, 1, rows.length, 4);
       range.setValues(rows);
       sheet.getRange(2, 1, rows.length, 1).insertCheckboxes();
-      SpreadsheetApp.getUi().alert(rows.length + " 件のクラスが見つかりました。");
+      SpreadsheetApp.getUi().alert(rows.length + " 件の授業WSが見つかりました。");
     } else {
       SpreadsheetApp.getUi().alert("'Classroom' フォルダは見つかりましたが、中身が空のようです。");
     }
@@ -95,7 +95,7 @@ function fetchFilesFromSelection() {
   }
 
   if (!selectedFolderId) {
-    SpreadsheetApp.getUi().alert("まず、クラスフォルダの横にあるボックスにチェックを入れてください。");
+    SpreadsheetApp.getUi().alert("まず、授業WSフォルダの横にあるボックスにチェックを入れてください。");
     return;
   }
 
@@ -294,15 +294,15 @@ function extractIdFromUrl(url) {
 
 ## 🚀 使い方
 
-スプレッドシートを開き、メニューバーに追加された **「🎓 クラスルームマネージャー」** から操作します。初回実行時は権限の承認（Authorization）が必要です。
+スプレッドシートを開き、メニューバーに追加された **「🎓 授業WSマネージャー」** から操作します。初回実行時は権限の承認（Authorization）が必要です。
 
-### 1. クラスを探す
-*   **「1. クラスを探す」** をクリック。
-*   `Classroom` フォルダ内のすべてのサブフォルダ（クラス）が一覧表示されます。
+### 1. 授業WSを探す
+*   **「1. 授業WSを探す」** をクリック。
+*   `Classroom` フォルダ内のすべてのサブフォルダ（授業WS）が一覧表示されます。
 
 ### 2. ファイルを取得
-*   A列のチェックボックスで、整理したいクラスを**1つ選択**します。
-*   **「2. 選択したクラスからファイルを取得」** をクリック。
+*   A列のチェックボックスで、整理したい授業WSを**1つ選択**します。
+*   **「2. 選択した授業WSからファイルを取得」** をクリック。
 *   そのフォルダ内のファイル一覧が表示されます（ショートカットも自動的に解決されます）。
 
 ### 3. ファイルを移動
