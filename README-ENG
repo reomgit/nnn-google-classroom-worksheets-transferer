@@ -1,16 +1,45 @@
-# Google Apps Script: Classroom Discovery Tool
+# Classroom Discovery Tool
 
-This script finds your "Classroom" folder automatically, lists your classes, and lets you manage files without ever leaving the spreadsheet.
+> A Google Apps Script that finds your "Classroom" folder automatically, lists your classes, and lets you manage files — all without leaving Google Sheets.
 
-## Setup Instructions
+---
 
-1.  **Create a New Google Sheet** (e.g., "Classroom Manager").
-2.  **Open Extensions > Apps Script**.
-3.  **Paste the following code**:
+## Table of Contents
+
+- [Features](#features)
+- [Setup](#setup)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [How It Works](#how-it-works)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Features
+
+- Automatically discovers your Google Classroom folder in Drive
+- Lists all class subfolders with checkboxes for selection
+- Fetches and sorts files from any selected class folder
+- Resolves Google Drive shortcuts to their real target files
+- Moves files to destination folders via pasted URLs
+- Syncs file names to match shortcut display names
+- Ownership safety check — only moves files you own
+
+---
+
+## Setup
+
+1. Create a new Google Sheet (e.g., "Classroom Manager").
+2. Go to **Extensions > Apps Script**.
+3. Delete any existing code and paste the script below.
+4. Save the project.
+5. Refresh the Google Sheet.
+
+### Script
 
 ```javascript
 // --- CONFIGURATION ---
-var ROOT_FOLDER_NAME = "Classroom"; 
+var ROOT_FOLDER_NAME = "Classroom";
 // ---------------------
 
 function onOpen() {
@@ -25,13 +54,13 @@ function onOpen() {
 function listClassFolders() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   sheet.clear();
-  
+
   sheet.appendRow(["Select", "Class Name", "Folder ID", "Folder URL"]);
   sheet.getRange("A1:D1").setFontWeight("bold");
-  
+
   var folders = DriveApp.getFoldersByName(ROOT_FOLDER_NAME);
   var rootFolder;
-  
+
   if (folders.hasNext()) {
     rootFolder = folders.next();
   } else {
@@ -42,12 +71,12 @@ function listClassFolders() {
   try {
     var subfolders = rootFolder.getFolders();
     var rows = [];
-    
+
     while (subfolders.hasNext()) {
       var folder = subfolders.next();
       rows.push(["☐", folder.getName(), folder.getId(), folder.getUrl()]);
     }
-    
+
     if (rows.length > 0) {
       var range = sheet.getRange(2, 1, rows.length, 4);
       range.setValues(rows);
@@ -67,12 +96,11 @@ function fetchFilesFromSelection() {
   var selectedFolderId = null;
   var selectedClassName = "";
 
-  // Skip header, find checked box
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === true) { 
+    if (data[i][0] === true) {
       selectedClassName = data[i][1];
       selectedFolderId = data[i][2];
-      break; 
+      break;
     }
   }
 
@@ -81,10 +109,9 @@ function fetchFilesFromSelection() {
     return;
   }
 
-  // Clear everything and explicitly remove validations
   sheet.clear();
-  sheet.getRange("A:E").clearDataValidations(); 
-  
+  sheet.getRange("A:E").clearDataValidations();
+
   sheet.appendRow(["Source: " + selectedClassName, "ID: " + selectedFolderId]);
   sheet.appendRow(["File Name", "File Link", "Target Folder URL (Paste Here)", "Status", "File ID"]);
   sheet.getRange("A2:E2").setFontWeight("bold");
@@ -94,54 +121,42 @@ function fetchFilesFromSelection() {
     var files = folder.getFiles();
     var allFiles = [];
 
-    // Diagnostics
     var shortcutCount = 0;
     var brokenShortcutCount = 0;
 
-    // Format Regex for sorting: Starts with Year_ (e.g. 2025_...)
     var formatRegex = /^\d{4}_/;
 
     while (files.hasNext()) {
       var file = files.next();
-      var name = file.getName(); // Default: Use the file's own name
+      var name = file.getName();
       var id = file.getId();
       var url = file.getUrl();
       var isShortcut = false;
       var targetAccessError = false;
-      
-      // --- SHORTCUT HANDLING ---
+
       if (file.getMimeType() === "application/vnd.google-apps.shortcut") {
         shortcutCount++;
         try {
-          var targetId = file.getTargetId(); // Get Target ID
-          
-          // Try to get the actual target file object
+          var targetId = file.getTargetId();
+
           try {
             var targetFile = DriveApp.getFileById(targetId);
-            url = targetFile.getUrl(); // Use Target URL if accessible
+            url = targetFile.getUrl();
           } catch (accessError) {
-             // If we can't access the target object (e.g. permission issues),
-             // We fallback to keeping the Shortcut's URL, but we still use Target ID.
              console.log("Could not access target object for: " + name);
              targetAccessError = true;
           }
 
-          // KEY BEHAVIOR: 
-          // 1. Keep Shortcut Name (Visual)
-          // 2. Use Target ID (Functional)
-          // 3. Use Target URL if possible, else Shortcut URL
-          name = file.getName(); 
-          id = targetId; 
+          name = file.getName();
+          id = targetId;
           isShortcut = true;
 
         } catch (e) {
-          // If even getTargetId() fails (very rare), then it's truly broken.
           brokenShortcutCount++;
           console.log("Totally Broken Shortcut: " + file.getName());
-          continue; 
+          continue;
         }
       }
-      // -------------------------
 
       if (targetAccessError) {
         name = name + " [⚠️ Restricted Target]";
@@ -155,7 +170,6 @@ function fetchFilesFromSelection() {
       });
     }
 
-    // --- SORTING LOGIC ---
     var formattedFiles = [];
     var otherFiles = [];
 
@@ -167,12 +181,10 @@ function fetchFilesFromSelection() {
       }
     });
 
-    // Natural Sort for Formatted files
     formattedFiles.sort(function(a, b) {
       return a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'});
     });
 
-    // Alphabetical (Japanese) for others
     otherFiles.sort(function(a, b) {
       return a.name.localeCompare(b.name, 'ja');
     });
@@ -204,45 +216,39 @@ function fetchFilesFromSelection() {
 function processMoveQueue() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var lastRow = sheet.getLastRow();
-  if (lastRow < 3) return; 
+  if (lastRow < 3) return;
 
   var dataRange = sheet.getRange(3, 1, lastRow - 2, 5);
   var data = dataRange.getValues();
   var ui = SpreadsheetApp.getUi();
-  
+
   var processedCount = 0;
   var myEmail = Session.getActiveUser().getEmail();
 
   for (var i = 0; i < data.length; i++) {
-    var sheetName = data[i][0]; // The name displayed in the Sheet
+    var sheetName = data[i][0];
     var targetUrl = data[i][2];
     var status = data[i][3];
-    var fileId = data[i][4]; // The TARGET ID
-    
-    // Skip rows that are already Done or Skipped
+    var fileId = data[i][4];
+
     if (status === "Done" || status.indexOf("Done") === 0 || status === "Skipped") continue;
 
-    // We process if there is a Target URL provided
     if (targetUrl !== "") {
       var log = [];
       try {
         var file = DriveApp.getFileById(fileId);
-        
-        // --- SAFETY CHECK: OWNERSHIP ---
+
         var owner = file.getOwner();
         if (!owner || owner.getEmail() !== myEmail) {
           data[i][3] = "Skipped (Not Owner)";
           continue;
         }
 
-        // 1. MOVE
         var targetFolderId = extractIdFromUrl(targetUrl);
         var targetFolder = DriveApp.getFolderById(targetFolderId);
         file.moveTo(targetFolder);
         log.push("Moved");
 
-        // 2. NAME SYNC (Renaming the Real File to match the Sheet Name)
-        // This ensures the Real File adopts the "Clean" name you gave the shortcut.
         if (file.getName() !== sheetName) {
            file.setName(sheetName);
            log.push("Renamed to Match");
@@ -256,10 +262,9 @@ function processMoveQueue() {
       }
     }
   }
-  
-  // Write back status
+
   dataRange.setValues(data);
-  
+
   ui.alert('Processed ' + processedCount + ' files.');
 }
 
@@ -271,22 +276,79 @@ function extractIdFromUrl(url) {
 }
 ```
 
-4.  **Save** and **Refresh** the Sheet.
+---
 
-## How to Use
+## Usage
 
-1.  **Authorize:** Run any command from the menu. You will see the "Authorization Required" popup. This is safe; it's asking permission to access *your* Drive folders.
-2.  **Step 1: Find My Classes:**
-    *   Click **🎓 Classroom Manager** > **1. Find My Classes**.
-    *   The sheet will clear and list all folders found inside your "Classroom" folder.
-3.  **Step 2: Select & Fetch:**
-    *   **Check the box** (Column A) next to the class you want to organize.
-    *   Click **2. Fetch Files from Selected Class**.
-    *   The sheet will reload with a list of all files in that class.
-4.  **Step 3: Assign & Move:**
-    *   Paste destination Folder URLs into **Column C**.
-    *   Click **3. Move Files**.
+### 1. Authorize
 
-## Troubleshooting Shortcuts
-If the script says "folder not found" or behaves oddly, it's possible your "Classroom" folder is named differently (e.g., "Google Classroom") or is deeply nested.
-*   **Fix:** Edit the top line of the code: `var ROOT_FOLDER_NAME = "Classroom";` to match your actual folder name.
+Run any command from the menu for the first time. You'll see an "Authorization Required" popup — this is safe and only requests access to your own Drive folders.
+
+### 2. Find My Classes
+
+1. Click **Classroom Manager > 1. Find My Classes**.
+2. The sheet populates with all subfolders inside your "Classroom" folder.
+3. Each row has a checkbox, the class name, folder ID, and folder URL.
+
+### 3. Select & Fetch Files
+
+1. Check the box (Column A) next to the class you want to organize.
+2. Click **2. Fetch Files from Selected Class**.
+3. The sheet reloads with all files in that class, sorted by:
+   - Files starting with `YYYY_` (natural numeric sort)
+   - Remaining files (alphabetical, Japanese locale)
+
+### 4. Assign & Move
+
+1. Paste destination folder URLs into **Column C** for each file you want to move.
+2. Click **3. Move Files**.
+3. The script moves each file and updates the Status column.
+
+---
+
+## Configuration
+
+Edit the variable at the top of the script to match your folder name:
+
+```javascript
+var ROOT_FOLDER_NAME = "Classroom";
+```
+
+Change `"Classroom"` to whatever your Google Classroom folder is actually named (e.g., `"Google Classroom"`).
+
+---
+
+## How It Works
+
+| Function | Description |
+|---|---|
+| `onOpen()` | Creates the custom menu in Google Sheets |
+| `listClassFolders()` | Searches Drive for the root folder and lists all subfolders |
+| `fetchFilesFromSelection()` | Reads files from the selected class folder, resolves shortcuts, and sorts results |
+| `processMoveQueue()` | Moves files to target folders and optionally renames them to match display names |
+| `extractIdFromUrl()` | Extracts a Google Drive folder/file ID from a URL |
+
+### Shortcut Handling
+
+When the script encounters a Google Drive shortcut:
+
+1. **Name** — keeps the shortcut's display name
+2. **ID** — uses the real target file's ID (so moves affect the actual file)
+3. **URL** — uses the target file's URL if accessible, otherwise falls back to the shortcut URL
+4. Broken shortcuts (where `getTargetId()` fails) are skipped entirely
+
+### Safety
+
+- Only files **you own** are moved. Non-owned files get status `Skipped (Not Owner)`.
+- Files are renamed only if the sheet name differs from the real file name.
+
+---
+
+## Troubleshooting
+
+| Problem                                     | Solution                                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------- |
+| "Could not find a folder named 'Classroom'" | Change `ROOT_FOLDER_NAME` to match your actual folder name                 |
+| Folder found but empty                      | Verify the folder has subfolders (not just files at the root level)        |
+| Files marked `[Restricted Target]`          | The shortcut points to a file you don't have permission to access directly |
+| `Skipped (Not Owner)`                       | You can only move files you own                                            |
